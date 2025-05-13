@@ -1,25 +1,230 @@
-﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.13.35931.197 d17.13
-MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp2", "ConsoleApp2\ConsoleApp2.csproj", "{1AD5BAED-EBB1-4C97-B8AA-1BF8449BD30D}"
-EndProject
-Global
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{1AD5BAED-EBB1-4C97-B8AA-1BF8449BD30D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1AD5BAED-EBB1-4C97-B8AA-1BF8449BD30D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1AD5BAED-EBB1-4C97-B8AA-1BF8449BD30D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1AD5BAED-EBB1-4C97-B8AA-1BF8449BD30D}.Release|Any CPU.Build.0 = Release|Any CPU
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {B018418D-E192-422E-8335-E6C08AE3E135}
-	EndGlobalSection
-EndGlobal
+using System;
+using System.Collections.Generic;
+
+public class Point
+{
+    public double X { get; }
+    public double Y { get; }
+
+    public Point(double x, double y)
+    {
+        X = x;
+        Y = y;
+    }
+
+    public override string ToString()
+    {
+        return $"({X}, {Y})";
+    }
+}
+
+public class Polygon : IComparable<Polygon>
+{
+    private List<Point> vertices;
+
+    public Polygon(List<Point> vertices)
+    {
+        if (vertices == null || vertices.Count < 3)
+            throw new ArgumentException("Многоугольник должен содержать минимум 3 вершины.");
+        this.vertices = new List<Point>(vertices);
+    }
+
+    public double CalculateArea()
+    {
+        int n = vertices.Count;
+        double area = 0.0;
+
+        for (int i = 0; i < n; i++)
+        {
+            int j = (i + 1) % n;
+            area += vertices[i].X * vertices[j].Y;
+            area -= vertices[j].X * vertices[i].Y;
+        }
+
+        return Math.Abs(area) / 2.0;
+    }
+
+    public bool IsConvex()
+    {
+        int n = vertices.Count;
+        if (n <= 3) return true;
+
+        bool? isPositive = null;
+
+        for (int i = 0; i < n; i++)
+        {
+            int j = (i + 1) % n;
+            int k = (i + 2) % n;
+
+            double dx1 = vertices[j].X - vertices[i].X;
+            double dy1 = vertices[j].Y - vertices[i].Y;
+            double dx2 = vertices[k].X - vertices[j].X;
+            double dy2 = vertices[k].Y - vertices[j].Y;
+
+            double cross = dx1 * dy2 - dy1 * dx2;
+
+            if (cross == 0) continue;
+
+            bool currentSign = cross > 0;
+
+            if (isPositive == null)
+                isPositive = currentSign;
+            else if (isPositive != currentSign)
+                return false;
+        }
+
+        return true;
+    }
+
+    public bool ContainsPoint(Point point)
+    {
+        int n = vertices.Count;
+        int intersections = 0;
+
+        for (int i = 0; i < n; i++)
+        {
+            int j = (i + 1) % n;
+            Point p1 = vertices[i];
+            Point p2 = vertices[j];
+
+            // Горизонтальное ребро игнорируется
+            if (p1.Y == p2.Y) continue; // Добавлена точка с запятой
+
+            if (IsPointOnSegment(point, p1, p2))
+                return true;
+
+            if (
+                (point.Y > Math.Min(p1.Y, p2.Y)) &&
+                (point.Y <= Math.Max(p1.Y, p2.Y)) &&
+                (point.X <= Math.Max(p1.X, p2.X))
+            )
+            {
+                if (p1.Y != p2.Y)
+                {
+                    double xIntersect = (point.Y - p1.Y) * (p2.X - p1.X) / (p2.Y - p1.Y) + p1.X;
+
+                    if (point.X <= xIntersect)
+                        intersections++;
+                }
+            }
+        }
+
+        return intersections % 2 == 1;
+    }
+
+    private bool IsPointOnSegment(Point p, Point a, Point b)
+    {
+        double minX = Math.Min(a.X, b.X);
+        double maxX = Math.Max(a.X, b.X);
+        double minY = Math.Min(a.Y, b.Y);
+        double maxY = Math.Max(a.Y, b.Y);
+
+        return p.X >= minX && p.X <= maxX &&
+               p.Y >= minY && p.Y <= maxY &&
+               (Math.Abs((b.Y - a.Y) * (p.X - a.X) - (p.Y - a.Y) * (b.X - a.X)) < 1e-10);
+    }
+
+    public static bool operator ==(Polygon a, Polygon b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a is null || b is null) return false;
+        return Math.Abs(a.CalculateArea() - b.CalculateArea()) < 1e-10;
+    }
+
+    public static bool operator !=(Polygon a, Polygon b)
+    {
+        if (a is null || b is null) return false;
+        return Math.Abs(a.CalculateArea() - b.CalculateArea()) >= 1e-10;
+    }
+
+    public static bool operator <(Polygon a, Polygon b)
+    {
+        if (a is null || b is null) return false;
+        return a.CalculateArea() < b.CalculateArea();
+    }
+
+    public static bool operator >(Polygon a, Polygon b)
+    {
+        if (a is null || b is null) return false;
+        return a.CalculateArea() > b.CalculateArea();
+    }
+
+    public static bool operator <=(Polygon a, Polygon b)
+    {
+        return a < b || a == b;
+    }
+
+    public static bool operator >=(Polygon a, Polygon b)
+    {
+        return a > b || a == b;
+    }
+
+    public int CompareTo(Polygon other)
+    {
+        if (other is null) return 1;
+        double areaDiff = CalculateArea() - other.CalculateArea();
+        return areaDiff < 0 ? -1 : areaDiff > 0 ? 1 : 0;
+    }
+
+    public static Polygon InputPolygon()
+    {
+        Console.Write("Введите количество вершин многоугольника: ");
+        int n = int.Parse(Console.ReadLine());
+
+        List<Point> vertices = new List<Point>();
+
+        for (int i = 0; i < n; i++)
+        {
+            Console.WriteLine($"Введите координаты вершины {i + 1}:");
+            Console.Write("X = ");
+            double x = double.Parse(Console.ReadLine());
+            Console.Write("Y = ");
+            double y = double.Parse(Console.ReadLine());
+            vertices.Add(new Point(x, y));
+        }
+
+        return new Polygon(vertices);
+    }
+
+    public override string ToString()
+    {
+        return $"Многоугольник с {vertices.Count} вершинами:\n" +
+               string.Join(", ", vertices) +
+               $"\nПлощадь: {CalculateArea():F2}\n" +
+               $"Выпуклый: {IsConvex()}\n";
+    }
+}
+
+class Program
+{
+    static void Main()
+    {
+        Console.WriteLine("=== Создание первого многоугольника ===");
+        Polygon poly1 = Polygon.InputPolygon();
+
+        Console.WriteLine("\n=== Создание второго многоугольника ===");
+        Polygon poly2 = Polygon.InputPolygon();
+
+        Console.WriteLine("\n=== Информация о многоугольниках ===");
+        Console.WriteLine(poly1);
+        Console.WriteLine(poly2);
+
+        Console.WriteLine("\n=== Сравнение многоугольников по площади ===");
+        if (poly1 == poly2)
+            Console.WriteLine("Многоугольники равны по площади.");
+        else if (poly1 < poly2)
+            Console.WriteLine("Первый многоугольник меньше второго по площади.");
+        else
+            Console.WriteLine("Первый многоугольник больше второго по площади.");
+
+        Console.WriteLine("\n=== Проверка принадлежности точки ===");
+        Console.WriteLine("Введите координаты точки для проверки:");
+        Console.Write("X = ");
+        double x = double.Parse(Console.ReadLine());
+        Console.Write("Y = ");
+        double y = double.Parse(Console.ReadLine());
+
+        Point testPoint = new Point(x, y);
+        Console.WriteLine($"Точка ({x}, {y}) {(poly1.ContainsPoint(testPoint) ? "принадлежит" : "не принадлежит")} первому многоугольнику."); // Добавлена закрывающая скобка )
+    }
+}
